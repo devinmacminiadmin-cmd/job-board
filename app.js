@@ -4,15 +4,15 @@
   var cfg = window.JOB_BOARD_CONFIG;
   var sb = window.supabase.createClient(cfg.url, cfg.key);
 
-  var STATUSES = ['lead', 'tailored', 'applied', 'screening', 'interview', 'offer', 'rejected', 'withdrawn', 'skipped'];
-  var ACTIVE = ['tailored', 'screening', 'interview', 'offer'];
-  var STATUS_LABEL = { lead: 'Lead', tailored: 'Tailored', applied: 'Applied', screening: 'Screening', interview: 'Interview',
+  var STATUSES = ['lead', 'queued', 'tailored', 'applied', 'screening', 'interview', 'offer', 'rejected', 'withdrawn', 'skipped'];
+  var ACTIVE = ['queued', 'tailored', 'screening', 'interview', 'offer'];
+  var STATUS_LABEL = { lead: 'Lead', queued: 'Queued for tailoring', tailored: 'Tailored', applied: 'Applied', screening: 'Screening', interview: 'Interview',
     offer: 'Offer', rejected: 'Rejected', withdrawn: 'Withdrawn', skipped: 'Skipped' };
   var CATEGORY_LABEL = { fde: 'Applied AI / FDE', se: 'Solutions Eng', pm: 'Product', 'ai-eng': 'AI Eng', fellows: 'Fellows', other: 'Other' };
   var COLORS = ['#D4521A', '#1B2A4A', '#2563EB', '#0F766E', '#7C3AED', '#B45309', '#BE185D', '#475569', '#15803D', '#2E6FB8'];
   // Only the columns a card header needs. Description and prep details are fetched when a card is opened.
   var LIST_COLS = 'id,owner,company,title,category,source,link,location,locations,remote,pay_text,status,date_found,date_applied,' +
-    'resume_path,referral,fit_score,fit_notes,notes,closed';
+    'resume_path,resume_url,gaps,referral,fit_score,fit_notes,notes,closed';
   var PAGE = 50;
   var TODAY = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in the viewer's timezone
 
@@ -227,6 +227,8 @@
     if (j.remote === true) tags += '<span class="lead-tag tag-remote">Remote</span>';
     else if (j.remote === false) tags += '<span class="lead-tag tag-onsite">On-site / hybrid</span>';
     if (locs.length > 1) tags += '<span class="lead-tag tag-other">' + locs.length + ' locations</span>';
+    var gaps = j.gaps || [];
+    if (gaps.length) tags += '<span class="lead-tag tag-gap">' + gaps.length + ' gap' + (gaps.length > 1 ? 's' : '') + '</span>';
     var fp = fitParts(j);
     var fitN = j.fit_score != null ? Math.round(Number(j.fit_score)) : null;
     var fit = fitN != null ? '<span class="fit-pill ' + fitTier(fitN) + '" data-fit-toggle="1" title="' + esc(fp.why || 'fit score') + '">fit ' + fitN + '</span>' : '';
@@ -271,9 +273,13 @@
                 (j.referral ? '<p class="meta-line"><strong>Referral:</strong> ' + esc(j.referral) + '</p>' : '') +
                 (locs.length ? '<p class="meta-line"><strong>Locations:</strong> ' + esc(locs.join(' · ')) + '</p>' : (j.location ? '<p class="meta-line"><strong>Location:</strong> ' + esc(j.location) + '</p>' : '')) +
                 (link ? '<p class="meta-line"><a href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">View posting</a></p>' : '') +
-                (j.resume_path ? '<p class="meta-line"><strong>Open resume:</strong> <span class="resume-file" title="' + esc(j.resume_path) + '">' + esc(j.resume_path.split('/').pop()) + '</span></p>' : '') +
+                (j.resume_url
+                  ? '<p class="meta-line"><button class="resume-btn" data-open-resume="' + esc(j.resume_url) + '">Open resume</button> <span class="resume-file">' + esc(j.resume_url.split('/').pop()) + '</span><span class="save-msg" data-resume-msg></span></p>'
+                  : (j.resume_path ? '<p class="meta-line"><strong>Resume:</strong> <span class="resume-file" title="' + esc(j.resume_path) + '">' + esc(j.resume_path.split('/').pop()) + '</span></p>' : '')) +
               '</div>' +
             '</div>' +
+            (gaps.length ? '<div class="gaps-box"><h4>Gaps: hard requirements not met</h4><ul>' +
+              gaps.map(function (g) { return '<li>' + esc(g) + '</li>'; }).join('') + '</ul></div>' : '') +
             '<div class="status-editor"><label>Update status</label><select data-status-select="' + esc(j.id) + '">' + statusOpts + '</select><span class="save-msg" data-status-msg></span></div>' +
           '</div>' +
           (hasPrep ? '<div class="tab-pane" data-pane="prep">' + assessmentHtml(d.assessmentPrep) +
@@ -373,6 +379,22 @@
     var card = t.closest('.job-card');
     if (!card) return;
     var id = card.getAttribute('data-id');
+    var rb = t.closest('[data-open-resume]');
+    if (rb) {
+      var msg = card.querySelector('[data-resume-msg]');
+      var win = window.open('', '_blank'); // open now so the popup isn't blocked, point it at the URL when ready
+      flash(msg, 'Opening…');
+      sb.storage.from('resumes').createSignedUrl(rb.getAttribute('data-open-resume'), 3600).then(function (r) {
+        if (r.error || !r.data) {
+          if (win) win.close();
+          flash(msg, 'Could not open: ' + (r.error ? r.error.message : 'no URL'), true);
+          return;
+        }
+        if (win) win.location = r.data.signedUrl; else window.location = r.data.signedUrl;
+        flash(msg, '');
+      });
+      return;
+    }
     var tb = t.closest('.tab-btn');
     if (tb) {
       card.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.toggle('active', b === tb); });
