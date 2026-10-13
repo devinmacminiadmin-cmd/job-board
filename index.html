@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Board</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Login: email, then a magic link -->
+<div id="login">
+  <div class="gate-card">
+    <div class="gate-icon">📋</div>
+    <h1>Job Board</h1>
+    <p>Sign in with a magic link</p>
+    <form id="login-form">
+      <input type="email" id="email" placeholder="Email" autocomplete="email" required>
+      <button type="submit" id="login-btn">Send magic link</button>
+    </form>
+    <div id="login-msg" role="status"></div>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app" hidden>
+  <nav class="nav">
+    <div class="nav-title">Job Board <span>2026</span></div>
+    <div class="nav-stats" id="nav-stats"></div>
+    <button class="signout" id="signout">Sign out</button>
+  </nav>
+  <div class="top-tab-bar">
+    <button class="top-tab-btn active" data-owner="devin">Devin's Job Search</button>
+    <button class="top-tab-btn" data-owner="linda">Linda's Job Search</button>
+  </div>
+  <div class="main">
+    <div id="banner" class="banner" hidden></div>
+    <div class="filter-group"><div class="filter-label">Status</div><div class="filter-bar" id="f-status"></div></div>
+    <div class="filter-group"><div class="filter-label">Category</div><div class="filter-bar" id="f-category"></div></div>
+    <div class="filter-group"><div class="filter-label">Location</div><div class="filter-bar" id="f-remote"></div></div>
+    <div class="result-count" id="result-count"></div>
+    <div id="jobs-list"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
