@@ -11,7 +11,9 @@
   var CATEGORY_LABEL = { fde: 'Applied AI / FDE', se: 'Solutions Eng', pm: 'Product', 'ai-eng': 'AI Eng', fellows: 'Fellows', other: 'Other' };
   var COLORS = ['#D4521A', '#1B2A4A', '#2563EB', '#0F766E', '#7C3AED', '#B45309', '#BE185D', '#475569', '#15803D', '#2E6FB8'];
 
-  var state = { jobs: [], owner: 'devin', status: 'all', category: 'all', remote: 'all', open: {} };
+  var LEAD_PAGE = 20;
+  var state = { jobs: [], owner: 'devin', status: 'all', category: 'all', remote: 'all', open: {}, hideClosed: true, leadLimit: LEAD_PAGE };
+  var TODAY = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in the viewer's timezone
 
   var $ = function (id) { return document.getElementById(id); };
   function esc(v) {
@@ -112,6 +114,7 @@
       if (state.category !== 'all' && j.category !== state.category) return false;
       if (state.remote === 'remote' && j.remote !== true) return false;
       if (state.remote === 'onsite' && j.remote === true) return false;
+      if (state.hideClosed && j.closed && (j.status === 'lead' || j.status === 'tailored')) return false;
       return true;
     }));
   }
@@ -134,13 +137,23 @@
       .map(function (s) { return chip('status', s, STATUS_LABEL[s], byStatus[s]); }).join('');
     $('f-category').innerHTML = chip('category', 'all', 'All', null) + Object.keys(CATEGORY_LABEL).filter(function (c) { return byCat[c]; })
       .map(function (c) { return chip('category', c, CATEGORY_LABEL[c], byCat[c]); }).join('');
-    $('f-remote').innerHTML = chip('remote', 'all', 'Any', null) + chip('remote', 'remote', 'Remote', null) + chip('remote', 'onsite', 'On-site / hybrid', null);
+    $('f-remote').innerHTML = chip('remote', 'all', 'Any', null) + chip('remote', 'remote', 'Remote', null) + chip('remote', 'onsite', 'On-site / hybrid', null) +
+      '<button class="filter-btn' + (state.hideClosed ? ' active' : '') + '" data-toggle-closed="1">Hide closed leads</button>';
 
     var stat = function (n, l) { return '<div class="nav-stat"><span class="num">' + n + '</span><span class="lbl">' + l + '</span></div>'; };
     var c = function (s) { return byStatus[s] || 0; };
     $('nav-stats').innerHTML = stat(c('lead') + c('tailored'), 'Leads') + stat(c('applied'), 'Applied') + stat(c('screening') + c('interview'), 'Active') +
       stat(c('offer'), 'Offers') + stat(c('rejected'), 'Rejected');
   }
+
+  // pipeline rows hold only the score explanation; tracker rows keep their own note after ' || '
+  function fitParts(j) {
+    var raw = j.fit_notes || '';
+    if ((j.source || '').indexOf(':') !== -1) return { why: raw, orig: '' };
+    var i = raw.indexOf(' || ');
+    return i === -1 ? { why: '', orig: raw } : { why: raw.slice(0, i), orig: raw.slice(i + 4) };
+  }
+  function fitTier(n) { return n >= 80 ? 'fit-hi' : (n >= 60 ? 'fit-mid' : 'fit-lo'); }
 
   function details(j) { return (j.details && typeof j.details === 'object') ? j.details : {}; }
 
@@ -172,7 +185,12 @@
     if (j.category) tags += '<span class="lead-tag tag-' + esc(j.category) + '">' + esc(CATEGORY_LABEL[j.category] || j.category) + '</span>';
     if (j.remote === true) tags += '<span class="lead-tag tag-remote">Remote</span>';
     else if (j.remote === false) tags += '<span class="lead-tag tag-onsite">On-site / hybrid</span>';
-    var fit = j.fit_score != null ? '<span class="fit-pill">fit ' + Number(j.fit_score).toFixed(2) + '</span>' : '';
+    var fp = fitParts(j);
+    var fitN = j.fit_score != null ? Math.round(Number(j.fit_score)) : null;
+    var fit = fitN != null ? '<span class="fit-pill ' + fitTier(fitN) + '" data-fit-toggle="1" title="' + esc(fp.why || 'fit score') + '">fit ' + fitN + '</span>' : '';
+    var isNew = j.date_found === TODAY && !j.closed;
+    var newTag = isNew ? '<span class="new-pill">New today</span>' : '';
+    var closedTag = j.closed ? '<span class="closed-tag">Closed</span>' : '';
     var link = safeUrl(j.link);
     var hasPrep = (d.questions && d.questions.length) || (d.talkingPoints && d.talkingPoints.length) || d.assessmentPrep;
 
@@ -191,7 +209,8 @@
         '<div class="co-badge" style="background:' + colorFor(j.company || j.title) + '">' + esc((j.company || j.title || '?').charAt(0)) + '</div>' +
         '<div class="job-info"><div class="job-co">' + esc(j.company || 'Unknown company') + '</div>' +
           '<div class="job-title">' + esc(j.title) + '</div>' +
-          '<div class="job-sub">' + (dateLine ? '<span>' + esc(dateLine) + '</span>' : '') + pay + (j.referral ? '<span class="referral-tag">Referral</span>' : '') + fit + '</div>' +
+          '<div class="job-sub">' + (dateLine ? '<span>' + esc(dateLine) + '</span>' : '') + pay + (j.referral ? '<span class="referral-tag">Referral</span>' : '') + newTag + fit + closedTag + '</div>' +
+          (fp.why ? '<div class="fit-pop" hidden>' + esc(fp.why) + '</div>' : '') +
           '<div class="lead-tags">' + tags + '</div></div>' +
         '<div class="job-right"><span class="status-badge s-' + esc(j.status) + '">' + esc(STATUS_LABEL[j.status] || j.status) + '</span><span class="chevron">&#8964;</span></div>' +
       '</div>' +
@@ -204,7 +223,8 @@
             (j.notes ? '<div class="note-banner">Note: ' + esc(j.notes) + '</div>' : '') +
             '<div class="overview-grid">' +
               '<div class="info-block"><h4>Description</h4><p>' + esc(j.description || 'No description saved.') + '</p>' +
-                (j.fit_notes ? '<div class="fit-box">' + esc(j.fit_notes) + '</div>' : '') + '</div>' +
+                (fp.why ? '<div class="fit-box"><strong>Score:</strong> ' + esc(fp.why) + '</div>' : '') +
+                (fp.orig ? '<div class="fit-box">' + esc(fp.orig) + '</div>' : '') + '</div>' +
               '<div class="info-block">' + (themes ? '<h4>Key Themes</h4><div>' + themes + '</div>' : '') +
                 (j.referral ? '<p class="meta-line"><strong>Referral:</strong> ' + esc(j.referral) + '</p>' : '') +
                 (j.location ? '<p class="meta-line"><strong>Location:</strong> ' + esc(j.location) + '</p>' : '') +
@@ -227,8 +247,15 @@
   function render() {
     renderFilters();
     var list = filtered();
-    $('result-count').textContent = list.length + ' of ' + mine().length + ' shown';
-    $('jobs-list').innerHTML = list.length ? list.map(cardHtml).join('') : '<p class="empty">Nothing matches these filters.</p>';
+    var leads = list.filter(function (j) { return j.status === 'lead'; });
+    var rest = list.filter(function (j) { return j.status !== 'lead'; });
+    var shown = leads.slice(0, state.leadLimit);
+    var hidden = leads.length - shown.length;
+    $('result-count').textContent = (shown.length + rest.length) + ' of ' + list.length + ' shown (' + mine().length + ' total)';
+    var html = shown.map(cardHtml).join('');
+    if (hidden > 0) html += '<button class="more-btn" data-more-leads="1">Show ' + Math.min(LEAD_PAGE, hidden) + ' more leads (' + hidden + ' hidden)</button>';
+    html += rest.map(cardHtml).join('');
+    $('jobs-list').innerHTML = html || '<p class="empty">Nothing matches these filters.</p>';
   }
 
   /* ---------- events ---------- */
@@ -260,12 +287,26 @@
     if (tab) {
       state.owner = tab.getAttribute('data-owner');
       state.status = state.category = state.remote = 'all';
+      state.leadLimit = LEAD_PAGE;
       document.querySelectorAll('.top-tab-btn').forEach(function (b) { b.classList.toggle('active', b === tab); });
       render();
       return;
     }
+    if (t.closest('[data-toggle-closed]')) { state.hideClosed = !state.hideClosed; render(); return; }
+    if (t.closest('[data-more-leads]')) { state.leadLimit += LEAD_PAGE; render(); return; }
+    var fpill = t.closest('[data-fit-toggle]');
+    if (fpill) {
+      var pop = fpill.closest('.job-info').querySelector('.fit-pop');
+      if (pop) pop.hidden = !pop.hidden;
+      return;
+    }
     var f = t.closest('.filter-btn');
-    if (f) { state[f.getAttribute('data-group')] = f.getAttribute('data-value'); render(); return; }
+    if (f) {
+      state[f.getAttribute('data-group')] = f.getAttribute('data-value');
+      if (f.getAttribute('data-group') === 'status' || f.getAttribute('data-group') === 'category' || f.getAttribute('data-group') === 'remote') state.leadLimit = LEAD_PAGE;
+      render();
+      return;
+    }
 
     var card = t.closest('.job-card');
     if (!card) return;

@@ -70,7 +70,15 @@ body {
 .s-rejected { background: #FFEBEE; color: #C62828; }
 .s-withdrawn { background: #F5F5F5; color: #757575; }
 .s-skipped { background: #F5F5F5; color: #9E9E9E; }
-.fit-pill { font-size: 11px; font-weight: 700; color: #6D28D9; background: #EDE9FE; padding: 2px 8px; border-radius: 10px; }
+.fit-pill { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; cursor: help; }
+.fit-hi { color: #065F46; background: #D1FAE5; }
+.fit-mid { color: #6D28D9; background: #EDE9FE; }
+.fit-lo { color: #475569; background: #F1F5F9; }
+.fit-pop { font-size: 12px; color: #444; background: #F8F9FB; border-radius: 6px; padding: 6px 10px; margin-top: 6px; }
+.new-pill { font-size: 11px; font-weight: 700; color: #fff; background: #E11D48; padding: 2px 8px; border-radius: 10px; }
+.closed-tag { font-size: 11px; font-weight: 700; color: #9E9E9E; background: #F5F5F5; padding: 2px 8px; border-radius: 10px; }
+.more-btn { display: block; width: 100%; padding: 12px; margin: 4px 0 18px; background: #fff; border: 1.5px dashed #2E6FB8; color: #2E6FB8; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.more-btn:hover { background: #EBF4FF; }
 .chevron { color: #BBB; font-size: 20px; transition: transform 0.2s; user-select: none; }
 .job-card.open .chevron { transform: rotate(180deg); }
 
